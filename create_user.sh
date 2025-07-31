@@ -1,42 +1,53 @@
-#!/bin/bash
-# usage: ./create_user_ssh.sh username /path/to/public_key.pub [--sudo] server_address
+#!/usr/bin/env bash
+set -e
 
 if [ $# -lt 3 ]; then
   echo "Использование: $0 USERNAME /path/to/key.pub [--sudo] SERVER_ADDRESS"
   exit 1
 fi
 
-USERNAME="$1"
-SSH_PUBKEY_PATH="$2"
-shift 2
+USERNAME="$1"; SSH_KEY="$2"; shift 2
 
 SUDO_FLAG=0
-if [ "$1" == "--sudo" ]; then
-  SUDO_FLAG=1
-  shift
+if [[ "$1" == "--sudo" ]]; then
+  SUDO_FLAG=1; shift
 fi
 
 SERVER="$1"
 
-# 1. Создать пользователя без пароля, без дополнительных вопросов
-adduser --disabled-password --gecos "" "$USERNAME"
-
-# 2. При желании дать sudo-права
-if [ "$SUDO_FLAG" -eq 1 ]; then
-  usermod -aG sudo "$USERNAME"
+# Проверяем права root
+if [ "$EUID" -ne 0 ]; then
+  echo "Этот скрипт нужно запускать от root или через sudo."
+  exit 1
 fi
 
-# 3. Создать каталог .ssh и добавить ключ
-mkdir -p "/home/$USERNAME/.ssh"
-cat "$SSH_PUBKEY_PATH" >> "/home/$USERNAME/.ssh/authorized_keys"
+# Создание пользователя
+if id "$USERNAME" &>/dev/null; then
+  echo "Пользователь $USERNAME уже существует"
+else
+  adduser --disabled-password --gecos "" --shell /bin/bash "$USERNAME"
+fi
 
-# 4. Установить правильные разрешения
-chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh"
-chmod 700 "/home/$USERNAME/.ssh"
-chmod 600 "/home/$USERNAME/.ssh/authorized_keys"
+# Добавление в sudo-группу (если нужно)
+if [ "$SUDO_FLAG" -eq 1 ]; then
+  usermod -aG sudo "$USERNAME"
+  # опционально: без необходимости ввода пароля при sudo
+  echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAME"
+  chmod 0440 "/etc/sudoers.d/$USERNAME"
+fi
 
-echo "Пользователь '$USERNAME' успешно создан."
-echo "Его публичный SSH ключ добавлен."
+# Настройка SSH-ключей
+HOME_DIR="/home/$USERNAME"
+SSH_DIR="$HOME_DIR/.ssh"
+mkdir -p "$SSH_DIR"
+cat "$SSH_KEY" > "$SSH_DIR/authorized_keys"
+
+chmod 700 "$SSH_DIR"
+chmod 600 "$SSH_DIR/authorized_keys"
+chown -R "$USERNAME:$USERNAME" "$SSH_DIR"
+
+echo "Пользователь '$USERNAME' успешно создан, ключ добавлен."
+
 echo
-echo "Команда для подключения по SSH:"
-echo "    ssh -i /путь/к/ключу_пользователя $USERNAME@$SERVER"
+echo "SSH-подключение:"
+echo "    ssh -i PRIVATE_KEY_PATH $USERNAME@$SERVER"
