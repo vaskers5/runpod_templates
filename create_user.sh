@@ -19,21 +19,21 @@ fi
 SERVER="$1"
 
 # 1. Создать пользователя без пароля, без дополнительных вопросов
-sudo adduser --disabled-password --gecos "" "$USERNAME"
+adduser --disabled-password --gecos "" "$USERNAME"
 
 # 2. При желании дать sudo-права
 if [ "$SUDO_FLAG" -eq 1 ]; then
-  sudo usermod -aG sudo "$USERNAME"
+  usermod -aG sudo "$USERNAME"
 fi
 
 # 3. Создать каталог .ssh и добавить ключ
-sudo -u "$USERNAME" mkdir -p "/home/$USERNAME/.ssh"
-sudo cat "$SSH_PUBKEY_PATH" >> "/home/$USERNAME/.ssh/authorized_keys"
+mkdir -p "/home/$USERNAME/.ssh"
+cat "$SSH_PUBKEY_PATH" >> "/home/$USERNAME/.ssh/authorized_keys"
 
 # 4. Установить правильные разрешения
-sudo chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh"
-sudo chmod 700 "/home/$USERNAME/.ssh"
-sudo chmod 600 "/home/$USERNAME/.ssh/authorized_keys"
+chown -R "$USERNAME:$USERNAME" "/home/$USERNAME/.ssh"
+chmod 700 "/home/$USERNAME/.ssh"
+chmod 600 "/home/$USERNAME/.ssh/authorized_keys"
 
 echo "Пользователь '$USERNAME' успешно создан."
 echo "Его публичный SSH ключ добавлен."
