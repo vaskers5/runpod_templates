@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ $# -lt 3 ]; then
-  echo "Использование: $0 USERNAME /path/to/key.pub [--sudo] SERVER_ADDRESS"
+  echo "Usage: $0 USERNAME /path/to/key.pub [--sudo] SERVER_ADDRESS"
   exit 1
 fi
 
@@ -19,43 +19,39 @@ fi
 SERVER="${1:-}"
 
 if [ "$EUID" -ne 0 ]; then
-  echo "Этот скрипт должен запускаться как root или через sudo."
+  echo "This script must run as root."
   exit 1
 fi
 
-# Проверка существования пользователя
 if id "$USERNAME" &>/dev/null; then
-  echo "Пользователь '$USERNAME' уже существует, пропускаем создание."
+  echo "User '$USERNAME' already exists — skipping creation."
 else
   adduser --disabled-password --gecos "" --shell /bin/bash "$USERNAME"
+  echo "Created user: $USERNAME"
 fi
 
-# Создание .ssh и копирование ключа
 HOME_DIR="/home/${USERNAME}"
 SSH_DIR="${HOME_DIR}/.ssh"
+
 mkdir -p "$SSH_DIR"
-cat "$SSH_KEY_PATH" > "${SSH_DIR}/authorized_keys"
-
-chown -R "${USERNAME}:${USERNAME}" "$SSH_DIR"
 chmod 700 "$SSH_DIR"
+chown "$USERNAME:$USERNAME" "$SSH_DIR"
+
+# Ensure authorized_keys exists and append to avoid overwriting
+cat "$SSH_KEY_PATH" >> "${SSH_DIR}/authorized_keys"
 chmod 600 "${SSH_DIR}/authorized_keys"
+chown "$USERNAME:$USERNAME" "${SSH_DIR}/authorized_keys"
+echo "SSH public key added to $SSH_DIR/authorized_keys"
 
-echo "SSH ключ установлен для пользователя '$USERNAME'."
-
-# Создать sudoers.d, если нужно sudo‑прав
 if [ "$SUDO_FLAG" -eq 1 ]; then
-  if [ ! -d /etc/sudoers.d ]; then
-    mkdir -p /etc/sudoers.d
-    chown root:root /etc/sudoers.d
-    chmod 755 /etc/sudoers.d
-  fi
+  mkdir -p /etc/sudoers.d
+  chmod 750 /etc/sudoers.d
   echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${USERNAME}"
-  chown root:root "/etc/sudoers.d/${USERNAME}"
-  chmod 0440 "/etc/sudoers.d/${USERNAME}"
-  echo "Пользователь '$USERNAME' добавлен в sudoers без запроса пароля."
+  chmod 440 "/etc/sudoers.d/${USERNAME}"
+  echo "Granted passwordless sudo to '$USERNAME'"
 fi
 
 echo
-echo "Пользователь '$USERNAME' успешно настроен."
-echo "Команда для подключения по SSH:"
-echo "    ssh -i /путь/к/приватному_ключу ${USERNAME}@${SERVER}"
+echo "✅ Setup complete for user '$USERNAME'."
+echo "SSH connection command:"
+echo "    ssh -i /path/to/private_key ${USERNAME}@${SERVER}"
