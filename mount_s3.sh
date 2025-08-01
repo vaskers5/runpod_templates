@@ -36,7 +36,9 @@ if [[ ! -e /dev/fuse ]]; then
     fi
   fi
   mkdir -p "$MOUNT_POINT"
-  aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT"
+  AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+    AWS_EC2_METADATA_DISABLED=true \
+    aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT"
   exit 0
 fi
 
