@@ -69,3 +69,8 @@ The `mount_s3.sh` script uses `s3fs` which relies on the FUSE kernel module. Ens
 your container has access to `/dev/fuse` and that FUSE is enabled on the host.
 When running with Docker, start the container with `--device /dev/fuse --cap-add SYS_ADMIN`
 (or `--privileged`) so the script can successfully mount the bucket.
+
+If FUSE cannot be enabled, the script falls back to copying the bucket with
+`aws s3 sync`. This provides a one-time synchronization but does not create a
+live mount.
+

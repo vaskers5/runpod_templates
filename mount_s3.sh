@@ -25,8 +25,13 @@ if [[ ! -e /dev/fuse ]]; then
 fi
 
 if [[ ! -e /dev/fuse ]]; then
-  echo "FUSE device /dev/fuse not found. S3 cannot be mounted. Ensure the container is started with access to FUSE (e.g. --device /dev/fuse --cap-add SYS_ADMIN)." >&2
-  exit 1
+  echo "FUSE device /dev/fuse not found. Falling back to 'aws s3 sync'." >&2
+  if ! command -v aws >/dev/null 2>&1; then
+    apt-get update && apt-get install -y --no-install-recommends awscli && rm -rf /var/lib/apt/lists/*
+  fi
+  mkdir -p "$MOUNT_POINT"
+  aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT"
+  exit 0
 fi
 
 # credentials file for s3fs
@@ -41,4 +46,3 @@ if mountpoint -q "$MOUNT_POINT"; then
 else
   s3fs "$BUCKET" "$MOUNT_POINT" -o url="$ENDPOINT" -o use_path_request_style -o allow_other -o passwd_file=/etc/passwd-s3fs
 fi
-
