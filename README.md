@@ -13,6 +13,7 @@ This repository contains pre-configured templates and automation scripts to help
 - GPU-optimized configurations
 - Common ML/AI frameworks templates
 - Network and storage configuration helpers
+- Automatic S3 mounting script
 
 ## Usage
 
@@ -53,6 +54,8 @@ ENV_VARIABLES:
 S3__ACCESS_KEY=
 S3__SECRET_KEY=
 S3__ENDPOINT_URL=
+S3_BUCKET=
+S3_MOUNT_POINT=
 ADMIN_USER_NAME=
 ADMIN_USER_PUBKEY=
 ADMIN_USER_SUDO=

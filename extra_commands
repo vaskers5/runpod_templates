@@ -73,5 +73,8 @@ else
     echo "Переменные ADMIN_USER_NAME и ADMIN_USER_PUBKEY не заданы. Пользователь не создан."
 fi
 
+# 3. Attempt to mount S3 storage using provided credentials
+/opt/scripts/mount_s3.sh
+
 echo "--- Контейнер готов к работе. Ожидание подключения... ---"
 '
