@@ -25,20 +25,40 @@ if [[ ! -e /dev/fuse ]]; then
 fi
 
 if [[ ! -e /dev/fuse ]]; then
-  echo "FUSE device /dev/fuse not found. Falling back to 'aws s3 sync'." >&2
-  if ! aws --version >/dev/null 2>&1; then
-    if ! command -v pip3 >/dev/null 2>&1 && ! command -v pip >/dev/null 2>&1; then
-      apt-get update && apt-get install -y --no-install-recommends python3-pip && rm -rf /var/lib/apt/lists/*
+  echo "FUSE device /dev/fuse not found. Falling back to sync." >&2
+
+  if ! command -v s5cmd >/dev/null 2>&1; then
+    if ! command -v curl >/dev/null 2>&1; then
+      apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
     fi
-    python3 -m pip install -q --no-cache-dir awscli
-    if command -v pyenv >/dev/null 2>&1; then
-      pyenv rehash
+    curl -fsSL -o /tmp/s5cmd.tar.gz https://github.com/peak/s5cmd/releases/download/v2.2.2/s5cmd_2.2.2_Linux-64bit.tar.gz \
+      && tar -xzf /tmp/s5cmd.tar.gz -C /tmp \
+      && install -m 0755 /tmp/s5cmd /usr/local/bin/s5cmd \
+      && rm -f /tmp/s5cmd.tar.gz
+  fi
+
+  if ! command -v s5cmd >/dev/null 2>&1; then
+    if ! aws --version >/dev/null 2>&1; then
+      if ! command -v pip3 >/dev/null 2>&1 && ! command -v pip >/dev/null 2>&1; then
+        apt-get update && apt-get install -y --no-install-recommends python3-pip && rm -rf /var/lib/apt/lists/*
+      fi
+      python3 -m pip install -q --no-cache-dir awscli
+      if command -v pyenv >/dev/null 2>&1; then
+        pyenv rehash
+      fi
     fi
   fi
+
   mkdir -p "$MOUNT_POINT"
-  AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
-    AWS_EC2_METADATA_DISABLED=true \
-    aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT"
+  if command -v s5cmd >/dev/null 2>&1; then
+    AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+      AWS_EC2_METADATA_DISABLED=true \
+      s5cmd --endpoint-url "$ENDPOINT" sync --concurrency 32 "s3://$BUCKET/*" "$MOUNT_POINT/"
+  else
+    AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+      AWS_EC2_METADATA_DISABLED=true \
+      aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT"
+  fi
   exit 0
 fi
 
