@@ -5,68 +5,56 @@ set -e
 if [ ! -f /opt/runpod_setup_complete ]; then
     echo "--- Выполняется первоначальная настройка контейнера ---"
 
-    # 1. Обновление пакетов и установка зависимостей
-    echo "Установка openssh-server, sudo, git..."
+    # 1. Установка зависимостей
+    echo "Установка зависимостей..."
     apt-get update && apt-get install -y --no-install-recommends \
-        openssh-server \
-        sudo \
-        git \
-        ca-certificates \
-        nano \
+        openssh-server sudo git ca-certificates nano wget \
         && rm -rf /var/lib/apt/lists/*
 
-    # 2. Клонирование репозитория со скриптами с использованием токена
+    # 2. Установка или обновление Miniconda
+    echo "Установка/обновление Miniconda в /opt/conda..."
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh
+    bash /tmp/miniconda.sh -b -u -p /opt/conda
+    rm /tmp/miniconda.sh
+    # ИСПОЛЬЗУЕМ -sf: s=symbolic, f=force. Это перезапишет ссылку, если она существует.
+    ln -sf /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
+
+    # 3. Клонирование репозитория со скриптами
     if [ -z "$GITHUB_TOKEN" ]; then
-        echo "Ошибка: Переменная окружения GITHUB_TOKEN не задана. Невозможно клонировать приватный репозиторий."
-        exit 1
+        echo "Ошибка: GITHUB_TOKEN не задана." && exit 1
     fi
     echo "Клонирование репозитория со скриптами..."
+    # Удаляем старую директорию, чтобы избежать ошибок git clone
+    rm -rf /opt/scripts
     git clone "https://github.com/vaskers5/runpod_templates" /opt/scripts
-    chmod +x /opt/scripts/create_user.sh
+    chmod +x /opt/scripts/*.sh
     rm -rf /opt/scripts/.git
 
-    # 3. Предварительная настройка SSH-сервера
+    # 4. Настройка SSH-сервера
     echo "Настройка конфигурации SSH..."
     mkdir -p /var/run/sshd
     sed -i "s/^#?PermitRootLogin.*/PermitRootLogin no/" /etc/ssh/sshd_config
     sed -i "s/^#?PasswordAuthentication.*/PasswordAuthentication no/" /etc/ssh/sshd_config
     sed -i "s/^#?PubkeyAuthentication.*/PubkeyAuthentication yes/" /etc/ssh/sshd_config
-    sed -i "s/^#?ChallengeResponseAuthentication.*/ChallengeResponseAuthentication no/" /etc/ssh/sshd_config
     sed -i "s/^#?UsePAM.*/UsePAM yes/" /etc/ssh/sshd_config
 
-    # 4. Создаем файл-флаг
+    # 5. Создаем файл-флаг
     touch /opt/runpod_setup_complete
     echo "--- Первоначальная настройка завершена ---"
 else
     echo "--- Первоначальная настройка уже выполнена, пропускается. ---"
 fi
 
-# --- Часть 2: Запуск сервисов и создание пользователя (выполняется всегда) ---
-
-# 1. Запуск SSH сервера
-echo "Запуск SSH сервера..."
+# --- Часть 2: Запуск сервисов и настройка пользователя (выполняется всегда) ---
+# ... (остальная часть скрипта без изменений) ...
 /usr/sbin/sshd -D &
-
-# 2. Создание пользователя
-echo "Проверка переменных для создания пользователя..."
 if [ -n "$ADMIN_USER_NAME" ] && [ -n "$ADMIN_USER_PUBKEY" ]; then
-    echo "Создание пользователя $ADMIN_USER_NAME..."
     KEY_FILE=$(mktemp)
     echo "$ADMIN_USER_PUBKEY" > "$KEY_FILE"
-    
     SUDO_ARG=""
-    if [ "$ADMIN_USER_SUDO" = "true" ]; then
-      SUDO_ARG="--sudo"
-    fi
-    
+    if [ "$ADMIN_USER_SUDO" = "true" ]; then SUDO_ARG="--sudo"; fi
     /opt/scripts/create_user.sh "$ADMIN_USER_NAME" "$KEY_FILE" $SUDO_ARG "pod_ip_or_domain"
-    
+    /opt/scripts/setup_conda_env.sh "$ADMIN_USER_NAME" "${PYTHON_VERSION:-3.10}"
     rm "$KEY_FILE"
-    echo "Пользователь $ADMIN_USER_NAME успешно настроен."
-else
-    echo "Переменные ADMIN_USER_NAME и ADMIN_USER_PUBKEY не заданы. Пользователь не создан."
 fi
-
-echo "--- Контейнер готов к работе. Ожидание подключения... ---"
-sleep infinity
 '
