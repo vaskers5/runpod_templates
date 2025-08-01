@@ -74,7 +74,7 @@ else
 fi
 
 # 3. Attempt to mount S3 storage using provided credentials
-/opt/scripts/mount_s3.sh
+/opt/scripts/mount.sh
 
 echo "--- Контейнер готов к работе. Ожидание подключения... ---"
 '
