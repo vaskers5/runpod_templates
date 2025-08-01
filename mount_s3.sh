@@ -26,12 +26,13 @@ fi
 
 if [[ ! -e /dev/fuse ]]; then
   echo "FUSE device /dev/fuse not found. Falling back to 'aws s3 sync'." >&2
-  if ! command -v aws >/dev/null 2>&1; then
-    if command -v pip >/dev/null 2>&1; then
-      pip install -q awscli
-    else
+  if ! aws --version >/dev/null 2>&1; then
+    if ! command -v pip3 >/dev/null 2>&1 && ! command -v pip >/dev/null 2>&1; then
       apt-get update && apt-get install -y --no-install-recommends python3-pip && rm -rf /var/lib/apt/lists/*
-      pip install -q awscli
+    fi
+    python3 -m pip install -q --no-cache-dir awscli
+    if command -v pyenv >/dev/null 2>&1; then
+      pyenv rehash
     fi
   fi
   mkdir -p "$MOUNT_POINT"
