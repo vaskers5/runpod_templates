@@ -36,3 +36,25 @@ Feel free to submit pull requests with additional templates or improvements to e
 ## License
 
 MIT License - see LICENSE file for details.
+
+overall_pod_template:
+image: runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
+start command copy from 'extra_command'
+container: 200gb
+volume: 1024gb
+volume mount path
+http ports:
+8001: 21
+8002: 20
+tcp ports: 
+8003 22
+
+ENV_VARIABLES:
+S3__ACCESS_KEY=
+S3__SECRET_KEY=
+S3__ENDPOINT_URL=
+ADMIN_USER_NAME=
+ADMIN_USER_PUBKEY=
+ADMIN_USER_SUDO=
+GITHUB_TOKEN=
+PYTHON_VERSION=3.12
