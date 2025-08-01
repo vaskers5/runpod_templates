@@ -42,7 +42,11 @@ if [[ ! -e /dev/fuse ]]; then
       && rm -f /tmp/s5cmd.tar.gz
   fi
 
-  if ! command -v s5cmd >/dev/null 2>&1; then
+  if ! command -v rclone >/dev/null 2>&1; then
+    apt-get update && apt-get install -y --no-install-recommends rclone && rm -rf /var/lib/apt/lists/*
+  fi
+
+  if ! command -v s5cmd >/dev/null 2>&1 && ! command -v rclone >/dev/null 2>&1; then
     if ! aws --version >/dev/null 2>&1; then
       if ! command -v pip3 >/dev/null 2>&1 && ! command -v pip >/dev/null 2>&1; then
         apt-get update && apt-get install -y --no-install-recommends python3-pip && rm -rf /var/lib/apt/lists/*
@@ -60,6 +64,12 @@ if [[ ! -e /dev/fuse ]]; then
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
       s5cmd --stat --endpoint-url "$ENDPOINT" sync --concurrency 32 "s3://$BUCKET/*" "$MOUNT_POINT/" | tee -a "$LOG_FILE"
+  elif command -v rclone >/dev/null 2>&1; then
+    AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+      AWS_EC2_METADATA_DISABLED=true \
+      rclone copy "s3:$BUCKET" "$MOUNT_POINT" --s3-endpoint "$ENDPOINT" -P \
+        --buffer-size=64M --s3-chunk-size=64M --s3-upload-concurrency=16 \
+        --transfers=16 --checkers=16 | tee -a "$LOG_FILE"
   else
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
