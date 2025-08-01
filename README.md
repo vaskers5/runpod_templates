@@ -62,3 +62,10 @@ ADMIN_USER_SUDO=
 GITHUB_TOKEN=
 PYTHON_VERSION=3.12
 ```
+
+### S3 Mount Requirements
+
+The `mount_s3.sh` script uses `s3fs` which relies on the FUSE kernel module. Ensure
+your container has access to `/dev/fuse` and that FUSE is enabled on the host.
+When running with Docker, start the container with `--device /dev/fuse --cap-add SYS_ADMIN`
+(or `--privileged`) so the script can successfully mount the bucket.
