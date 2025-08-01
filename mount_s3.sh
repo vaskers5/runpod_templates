@@ -33,6 +33,10 @@ if [[ ! -e /dev/fuse ]]; then
   echo "FUSE device /dev/fuse not found. Falling back to sync." >&2
   echo "$(date '+%F %T') FUSE unavailable; performing S3 sync" | tee -a "$LOG_FILE"
 
+  if ! command -v rclone >/dev/null 2>&1; then
+    apt-get update && apt-get install -y --no-install-recommends rclone && rm -rf /var/lib/apt/lists/*
+  fi
+
   if ! command -v s5cmd >/dev/null 2>&1; then
     if ! command -v curl >/dev/null 2>&1; then
       apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
@@ -43,11 +47,7 @@ if [[ ! -e /dev/fuse ]]; then
       && rm -f /tmp/s5cmd.tar.gz
   fi
 
-  if ! command -v rclone >/dev/null 2>&1; then
-    apt-get update && apt-get install -y --no-install-recommends rclone && rm -rf /var/lib/apt/lists/*
-  fi
-
-  if ! command -v s5cmd >/dev/null 2>&1 && ! command -v rclone >/dev/null 2>&1; then
+  if ! command -v rclone >/dev/null 2>&1 && ! command -v s5cmd >/dev/null 2>&1; then
     if ! aws --version >/dev/null 2>&1; then
       if ! command -v pip3 >/dev/null 2>&1 && ! command -v pip >/dev/null 2>&1; then
         apt-get update && apt-get install -y --no-install-recommends python3-pip && rm -rf /var/lib/apt/lists/*
@@ -61,19 +61,22 @@ if [[ ! -e /dev/fuse ]]; then
 
   mkdir -p "$MOUNT_POINT"
   echo "$(date '+%F %T') Starting sync from s3://$BUCKET to $MOUNT_POINT" | tee -a "$LOG_FILE"
-  if command -v s5cmd >/dev/null 2>&1; then
-    AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
-      AWS_EC2_METADATA_DISABLED=true \
-      s5cmd --stat --endpoint-url "$ENDPOINT" \
-        sync --concurrency "$CPU_COUNT" "s3://$BUCKET/*" "$MOUNT_POINT/" | tee -a "$LOG_FILE"
-  elif command -v rclone >/dev/null 2>&1; then
+  if command -v rclone >/dev/null 2>&1; then
+    echo "$(date '+%F %T') syncing via rclone" | tee -a "$LOG_FILE"
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
       rclone copy "s3:$BUCKET" "$MOUNT_POINT" --s3-endpoint "$ENDPOINT" -P \
         --stats=1s --buffer-size=64M --s3-chunk-size=64M \
         --s3-upload-concurrency="$CPU_COUNT" \
         --transfers="$CPU_COUNT" --checkers="$CPU_COUNT" | tee -a "$LOG_FILE"
+  elif command -v s5cmd >/dev/null 2>&1; then
+    echo "$(date '+%F %T') syncing via s5cmd" | tee -a "$LOG_FILE"
+    AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
+      AWS_EC2_METADATA_DISABLED=true \
+      s5cmd --stat --endpoint-url "$ENDPOINT" \
+        sync --concurrency "$CPU_COUNT" "s3://$BUCKET/*" "$MOUNT_POINT/" | tee -a "$LOG_FILE"
   else
+    echo "$(date '+%F %T') syncing via aws s3 sync" | tee -a "$LOG_FILE"
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true AWS_MAX_CONCURRENCY="$CPU_COUNT" \
       aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT" | tee -a "$LOG_FILE"
