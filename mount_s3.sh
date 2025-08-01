@@ -54,8 +54,9 @@ perform_sync() {
     echo "$(date '+%F %T') syncing via rclone" | tee -a "$LOG_FILE"
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
-      rclone copy "s3:$BUCKET" "$MOUNT_POINT" --s3-endpoint "$ENDPOINT" -P \
-        --stats=1s --buffer-size=64M --s3-chunk-size=64M \
+      rclone copy "s3:$BUCKET" "$MOUNT_POINT" --s3-endpoint "$ENDPOINT" \
+        --stats=1s --stats-one-line --stats-log-level NOTICE \
+        --buffer-size=64M --s3-chunk-size=64M \
         --s3-upload-concurrency="$CPU_COUNT" \
         --transfers="$CPU_COUNT" --checkers="$CPU_COUNT" | tee -a "$LOG_FILE"
   elif command -v s5cmd >/dev/null 2>&1; then
