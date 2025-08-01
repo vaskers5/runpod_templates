@@ -7,6 +7,7 @@ ACCESS_KEY="${S3__ACCESS_KEY:-}"
 SECRET_KEY="${S3__SECRET_KEY:-}"
 ENDPOINT="${S3__ENDPOINT_URL:-}"
 LOG_FILE="/var/log/s3_sync.log"
+CPU_COUNT="$(nproc)"
 
 if [[ -z "$BUCKET" || -z "$ACCESS_KEY" || -z "$SECRET_KEY" || -z "$ENDPOINT" ]]; then
   echo "S3 mount variables not fully specified. Skipping mount."
@@ -63,16 +64,18 @@ if [[ ! -e /dev/fuse ]]; then
   if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
-      s5cmd --stat --endpoint-url "$ENDPOINT" sync --concurrency 32 "s3://$BUCKET/*" "$MOUNT_POINT/" | tee -a "$LOG_FILE"
+      s5cmd --stat --endpoint-url "$ENDPOINT" \
+        sync --concurrency "$CPU_COUNT" "s3://$BUCKET/*" "$MOUNT_POINT/" | tee -a "$LOG_FILE"
   elif command -v rclone >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
       rclone copy "s3:$BUCKET" "$MOUNT_POINT" --s3-endpoint "$ENDPOINT" -P \
-        --buffer-size=64M --s3-chunk-size=64M --s3-upload-concurrency=16 \
-        --transfers=16 --checkers=16 | tee -a "$LOG_FILE"
+        --stats=1s --buffer-size=64M --s3-chunk-size=64M \
+        --s3-upload-concurrency="$CPU_COUNT" \
+        --transfers="$CPU_COUNT" --checkers="$CPU_COUNT" | tee -a "$LOG_FILE"
   else
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
-      AWS_EC2_METADATA_DISABLED=true \
+      AWS_EC2_METADATA_DISABLED=true AWS_MAX_CONCURRENCY="$CPU_COUNT" \
       aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT" | tee -a "$LOG_FILE"
   fi
   echo "$(date '+%F %T') Sync complete" | tee -a "$LOG_FILE"
