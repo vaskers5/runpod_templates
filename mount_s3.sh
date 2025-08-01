@@ -6,11 +6,15 @@ MOUNT_POINT="${S3_MOUNT_POINT:-/mnt/s3}"
 ACCESS_KEY="${S3__ACCESS_KEY:-}"
 SECRET_KEY="${S3__SECRET_KEY:-}"
 ENDPOINT="${S3__ENDPOINT_URL:-}"
+LOG_FILE="/var/log/s3_sync.log"
 
 if [[ -z "$BUCKET" || -z "$ACCESS_KEY" || -z "$SECRET_KEY" || -z "$ENDPOINT" ]]; then
   echo "S3 mount variables not fully specified. Skipping mount."
   exit 0
 fi
+
+# ensure log directory exists
+mkdir -p "$(dirname "$LOG_FILE")"
 
 # ensure s3fs is available
 if ! command -v s3fs >/dev/null 2>&1; then
@@ -26,6 +30,7 @@ fi
 
 if [[ ! -e /dev/fuse ]]; then
   echo "FUSE device /dev/fuse not found. Falling back to sync." >&2
+  echo "$(date '+%F %T') FUSE unavailable; performing S3 sync" | tee -a "$LOG_FILE"
 
   if ! command -v s5cmd >/dev/null 2>&1; then
     if ! command -v curl >/dev/null 2>&1; then
@@ -50,15 +55,17 @@ if [[ ! -e /dev/fuse ]]; then
   fi
 
   mkdir -p "$MOUNT_POINT"
+  echo "$(date '+%F %T') Starting sync from s3://$BUCKET to $MOUNT_POINT" | tee -a "$LOG_FILE"
   if command -v s5cmd >/dev/null 2>&1; then
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
-      s5cmd --endpoint-url "$ENDPOINT" sync --concurrency 32 "s3://$BUCKET/*" "$MOUNT_POINT/"
+      s5cmd --stat --endpoint-url "$ENDPOINT" sync --concurrency 32 "s3://$BUCKET/*" "$MOUNT_POINT/" | tee -a "$LOG_FILE"
   else
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
-      aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT"
+      aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT" | tee -a "$LOG_FILE"
   fi
+  echo "$(date '+%F %T') Sync complete" | tee -a "$LOG_FILE"
   exit 0
 fi
 
