@@ -62,6 +62,7 @@ ADMIN_USER_SUDO=
 ADMIN_USERS=
 GITHUB_TOKEN=
 PYTHON_VERSION=3.12
+ADMIN_USERS="alice:ssh-ed25519 AAAAB3Nza...:true;bob:ssh-ed25519 AAAAB3Nza...:false"
 ```
 
 `ADMIN_USERS` allows defining multiple users at once using a semicolon separated
