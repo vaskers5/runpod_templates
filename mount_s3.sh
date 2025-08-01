@@ -12,8 +12,21 @@ if [[ -z "$BUCKET" || -z "$ACCESS_KEY" || -z "$SECRET_KEY" || -z "$ENDPOINT" ]];
   exit 0
 fi
 
+# ensure s3fs is available
 if ! command -v s3fs >/dev/null 2>&1; then
   apt-get update && apt-get install -y --no-install-recommends s3fs && rm -rf /var/lib/apt/lists/*
+fi
+
+# check that FUSE device exists and try to load module if missing
+if [[ ! -e /dev/fuse ]]; then
+  if command -v modprobe >/dev/null 2>&1; then
+    modprobe fuse 2>/dev/null || true
+  fi
+fi
+
+if [[ ! -e /dev/fuse ]]; then
+  echo "FUSE device /dev/fuse not found. S3 cannot be mounted. Ensure the container is started with access to FUSE (e.g. --device /dev/fuse --cap-add SYS_ADMIN)." >&2
+  exit 1
 fi
 
 # credentials file for s3fs
