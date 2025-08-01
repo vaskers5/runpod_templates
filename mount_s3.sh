@@ -14,6 +14,15 @@ ensure_sync_tools() {
   if ! command -v rclone >/dev/null 2>&1; then
     apt-get update && apt-get install -y --no-install-recommends rclone && rm -rf /var/lib/apt/lists/*
   fi
+  # create basic rclone config so the "s3" remote works
+  mkdir -p /root/.config/rclone
+  cat <<EOF >/root/.config/rclone/rclone.conf
+[s3]
+type = s3
+provider = Minio
+env_auth = true
+endpoint = ${ENDPOINT}
+EOF
   if ! command -v s5cmd >/dev/null 2>&1; then
     if ! command -v curl >/dev/null 2>&1; then
       apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
