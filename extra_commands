@@ -51,26 +51,42 @@ fi
 /usr/sbin/sshd -D &
 
 # 2. Создание пользователя и его окружения на основе переменных окружения
-if [ -n "$ADMIN_USER_NAME" ] && [ -n "$ADMIN_USER_PUBKEY" ]; then
+if [ -n "$ADMIN_USERS" ]; then
+    IFS=';' read -ra USER_ENTRIES <<< "$ADMIN_USERS"
+    for ENTRY in "${USER_ENTRIES[@]}"; do
+        IFS=':' read -r USERNAME USERKEY USERSUDO <<< "$ENTRY"
+        [ -z "$USERNAME" ] && continue
+        echo "--- Настройка пользователя $USERNAME ---"
+        KEY_FILE=$(mktemp)
+        echo "$USERKEY" > "$KEY_FILE"
+
+        SUDO_ARG=""
+        if [ "$USERSUDO" = "true" ]; then
+          SUDO_ARG="--sudo"
+        fi
+
+        /opt/scripts/create_user.sh "$USERNAME" "$KEY_FILE" $SUDO_ARG "pod_ip_or_domain"
+        /opt/scripts/setup_conda_env.sh "$USERNAME" "${PYTHON_VERSION:-3.10}"
+        rm "$KEY_FILE"
+        echo "--- Пользователь $USERNAME и его окружение полностью настроены. ---"
+    done
+elif [ -n "$ADMIN_USER_NAME" ] && [ -n "$ADMIN_USER_PUBKEY" ]; then
     echo "--- Настройка пользователя $ADMIN_USER_NAME ---"
     KEY_FILE=$(mktemp)
     echo "$ADMIN_USER_PUBKEY" > "$KEY_FILE"
-    
+
     SUDO_ARG=""
     if [ "$ADMIN_USER_SUDO" = "true" ]; then
       SUDO_ARG="--sudo"
     fi
-    
-    # Шаг 2.1: Создать пользователя
+
     /opt/scripts/create_user.sh "$ADMIN_USER_NAME" "$KEY_FILE" $SUDO_ARG "pod_ip_or_domain"
-    
-    # Шаг 2.2: Создать для него окружение Conda
     /opt/scripts/setup_conda_env.sh "$ADMIN_USER_NAME" "${PYTHON_VERSION:-3.10}"
 
     rm "$KEY_FILE"
     echo "--- Пользователь $ADMIN_USER_NAME и его окружение полностью настроены. ---"
 else
-    echo "Переменные ADMIN_USER_NAME и ADMIN_USER_PUBKEY не заданы. Пользователь не создан."
+    echo "Переменные ADMIN_USER_NAME или ADMIN_USERS не заданы. Пользователь не создан."
 fi
 
 # 3. Attempt to mount S3 storage using provided credentials
