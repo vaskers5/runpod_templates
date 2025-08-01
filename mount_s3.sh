@@ -27,7 +27,12 @@ fi
 if [[ ! -e /dev/fuse ]]; then
   echo "FUSE device /dev/fuse not found. Falling back to 'aws s3 sync'." >&2
   if ! command -v aws >/dev/null 2>&1; then
-    apt-get update && apt-get install -y --no-install-recommends awscli && rm -rf /var/lib/apt/lists/*
+    if command -v pip >/dev/null 2>&1; then
+      pip install -q awscli
+    else
+      apt-get update && apt-get install -y --no-install-recommends python3-pip && rm -rf /var/lib/apt/lists/*
+      pip install -q awscli
+    fi
   fi
   mkdir -p "$MOUNT_POINT"
   aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT"
