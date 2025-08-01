@@ -46,4 +46,3 @@ if mountpoint -q "$MOUNT_POINT"; then
 else
   s3fs "$BUCKET" "$MOUNT_POINT" -o url="$ENDPOINT" -o use_path_request_style -o allow_other -o passwd_file=/etc/passwd-s3fs
 fi
-
