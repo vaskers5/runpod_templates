@@ -1,4 +1,4 @@
-bash -c '
+bash <<'EOF'
 set -e
 
 # --- Часть 1: Первоначальная настройка (выполняется только один раз) ---
@@ -52,7 +52,7 @@ fi
 
 # 2. Создание пользователя и его окружения на основе переменных окружения
 if [ -n "$ADMIN_USERS" ]; then
-    echo "$ADMIN_USERS" | tr ';' '\n' | while IFS=':' read -r USERNAME USERKEY USERSUDO; do
+    printf '%s\n' "$ADMIN_USERS" | tr ';' '\n' | while IFS=':' read -r USERNAME USERKEY USERSUDO; do
         USERNAME=$(echo "$USERNAME" | tr -d '[:space:]')
         [ -z "$USERNAME" ] && continue
         echo "--- Настройка пользователя $USERNAME ---"
@@ -93,4 +93,4 @@ fi
 
 echo "--- Контейнер готов к работе. Ожидание подключения... ---"
 sleep infinity
-'
+EOF
