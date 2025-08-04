@@ -52,16 +52,15 @@ fi
 
 # 2. Создание пользователя и его окружения на основе переменных окружения
 if [ -n "$ADMIN_USERS" ]; then
-    IFS=';' read -ra USER_ENTRIES <<< "$ADMIN_USERS"
-    for ENTRY in "${USER_ENTRIES[@]}"; do
-        IFS=':' read -r USERNAME USERKEY USERSUDO <<< "$ENTRY"
+    echo "$ADMIN_USERS" | tr ';' '\n' | while IFS=':' read -r USERNAME USERKEY USERSUDO; do
+        USERNAME=$(echo "$USERNAME" | tr -d '[:space:]')
         [ -z "$USERNAME" ] && continue
         echo "--- Настройка пользователя $USERNAME ---"
         KEY_FILE=$(mktemp)
         echo "$USERKEY" > "$KEY_FILE"
 
         SUDO_ARG=""
-        if [ "$USERSUDO" = "true" ]; then
+        if [ "$(echo "$USERSUDO" | tr -d '[:space:]')" = "true" ]; then
           SUDO_ARG="--sudo"
         fi
 
