@@ -59,9 +59,15 @@ S3_MOUNT_POINT=
 ADMIN_USER_NAME=
 ADMIN_USER_PUBKEY=
 ADMIN_USER_SUDO=
+ADMIN_USERS=
 GITHUB_TOKEN=
 PYTHON_VERSION=3.12
+ADMIN_USERS="alice:ssh-ed25519 AAAAB3Nza...:true;bob:ssh-ed25519 AAAAB3Nza...:false"
 ```
+
+`ADMIN_USERS` allows defining multiple users at once using a semicolon separated
+list with the format `username:ssh_key:sudo`. Set `sudo` to `true` to grant the
+user passwordless sudo access.
 
 ### S3 Mount Requirements
 
