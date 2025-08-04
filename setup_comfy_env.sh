@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 USERNAME [PYTHON_VERSION]" >&2
+  exit 1
+fi
+
+USERNAME="$1"
+PYTHON_VERSION="${2:-3.10}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMFY_ENV_NAME="${COMFY_ENV_NAME:-comfy_env}"
+COMFY_REPO_URL="${COMFY_REPO_URL:-https://github.com/comfyanonymous/ComfyUI.git}"
+COMFY_DATA_DIR="${COMFY_DATA_DIR:-/data/marketing}"
+COMFY_DIR="${COMFY_DIR:-$COMFY_DATA_DIR/comfy}"
+COMFY_EXTENSION_LIST="${COMFY_EXTENSION_LIST:-$SCRIPT_DIR/comfy_data/extension_list.txt}"
+COMFY_EXTRA_MODEL_PATHS="${COMFY_EXTRA_MODEL_PATHS:-$SCRIPT_DIR/comfy_data/extra_model_paths.yaml}"
+
+if [ "$EUID" -ne 0 ]; then
+  echo "This script must run as root." >&2
+  exit 1
+fi
+
+if ! id "$USERNAME" &>/dev/null; then
+  echo "Error: User '$USERNAME' does not exist." >&2
+  exit 1
+fi
+
+echo "--- Setting up ComfyUI environment '${COMFY_ENV_NAME}' for user '${USERNAME}'... ---"
+
+mkdir -p "$COMFY_DATA_DIR"
+chown -R "$USERNAME":"$USERNAME" "$COMFY_DATA_DIR"
+
+EXT_LIST="$COMFY_EXTENSION_LIST"
+EXTRA_MODELS="$COMFY_EXTRA_MODEL_PATHS"
+
+sudo -u "$USERNAME" bash <<EOFUSER
+set -e
+source /etc/profile.d/conda.sh
+if ! conda env list | awk '{print \$1}' | grep -qx "$COMFY_ENV_NAME"; then
+  conda create -y -n "$COMFY_ENV_NAME" python="$PYTHON_VERSION"
+fi
+conda activate "$COMFY_ENV_NAME"
+pip3 install --upgrade pip
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+
+if [ ! -d "$COMFY_DIR" ]; then
+  git clone "$COMFY_REPO_URL" "$COMFY_DIR"
+fi
+
+cd "$COMFY_DIR"
+pip3 install -r requirements.txt
+
+if [ -f "$EXT_LIST" ]; then
+  mkdir -p custom_nodes
+  while IFS= read -r repo; do
+    repo="$(echo "$repo" | xargs)"
+    [ -z "$repo" ] && continue
+    [[ "$repo" == \#* ]] && continue
+    name="$(basename "$repo" .git)"
+    target="custom_nodes/$name"
+    if [ ! -d "$target" ]; then
+      git clone "$repo" "$target"
+    fi
+  done < "$EXT_LIST"
+fi
+
+if [ -f "$EXTRA_MODELS" ]; then
+  cp "$EXTRA_MODELS" extra_model_paths.yaml
+fi
+EOFUSER
+
+USER_HOME=$(eval echo ~"$USERNAME")
+printf '\nexport COMFY_DATA_DIR="%s"\nexport COMFY_DIR="%s"\nexport COMFY_ENV_NAME="%s"\n' "$COMFY_DATA_DIR" "$COMFY_DIR" "$COMFY_ENV_NAME" | sudo -u "$USERNAME" tee -a "$USER_HOME/.bashrc" >/dev/null
+
+echo "✅ ComfyUI environment '$COMFY_ENV_NAME' set up at '$COMFY_DIR' for user '$USERNAME'."
+echo "To use it run: conda activate $COMFY_ENV_NAME && cd $COMFY_DIR"

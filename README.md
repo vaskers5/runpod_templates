@@ -29,6 +29,7 @@ This repository contains pre-configured templates and automation scripts to help
 - Data science stack (Jupyter, pandas, numpy)
 - Web development environment
 - Custom GPU configurations
+- ComfyUI environment setup
 
 ## Contributing
 
@@ -63,11 +64,22 @@ ADMIN_USERS=
 GITHUB_TOKEN=
 PYTHON_VERSION=3.12
 ADMIN_USERS="alice:ssh-ed25519 AAAAB3Nza...:true;bob:ssh-ed25519 AAAAB3Nza...:false"
+COMFY_ENV_NAME=comfy_env
+COMFY_REPO_URL=https://github.com/comfyanonymous/ComfyUI.git
+COMFY_DATA_DIR=/data/marketing
+COMFY_DIR=/data/marketing/comfy
+COMFY_EXTENSION_LIST=comfy_data/extension_list.txt
+COMFY_EXTRA_MODEL_PATHS=comfy_data/extra_model_paths.yaml
 ```
 
 `ADMIN_USERS` allows defining multiple users at once using a semicolon separated
 list with the format `username:ssh_key:sudo`. Set `sudo` to `true` to grant the
 user passwordless sudo access.
+
+The `setup_comfy_env.sh` script installs ComfyUI into `/data/marketing/comfy`,
+installs PyTorch from the official wheel index, clones any extensions listed in
+`comfy_data/extension_list.txt`, and copies `comfy_data/extra_model_paths.yaml`
+to the ComfyUI directory.
 
 ### S3 Mount Requirements
 
