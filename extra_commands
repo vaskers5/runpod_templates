@@ -93,4 +93,5 @@ fi
 /opt/scripts/mount_s3.sh
 
 echo "--- Контейнер готов к работе. Ожидание подключения... ---"
+sleep infinity
 '
