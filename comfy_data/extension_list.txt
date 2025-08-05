@@ -1,4 +1,0 @@
-# List of ComfyUI extension repositories to install.
-# One URL per line. Lines beginning with '#' are ignored.
-# Example:
-https://github.com/Comfy-Org/ComfyUI-Manager
