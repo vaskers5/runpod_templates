@@ -58,13 +58,14 @@ COMFY_ENV_NAME=comfy_env
 COMFY_REPO_URL=https://github.com/comfyanonymous/ComfyUI.git
 COMFY_DATA_DIR=/data/marketing
 COMFY_DIR=/data/marketing/comfy
-COMFY_EXTENSION_LIST=comfy_data/extension_list.txt
+COMFY_EXTENSION_LIST_DIR=comfy_data/extension_lists
+COMFY_EXTENSION_LIST_NAME=default
 COMFY_EXTRA_MODEL_PATHS=comfy_data/extra_model_paths.yaml
 ```
 
 for creating comfy environment for specified user
 ```bash
-sudo bash opt/scripts/setup_comfy_env.sh usename /data/username/comfy 3.12
+sudo bash opt/scripts/setup_comfy_env.sh usename /data/username/comfy 3.12 default
 ```
 `ADMIN_USERS` allows defining multiple users at once using a semicolon separated
 list with the format `username:ssh_key:sudo`. Set `sudo` to `true` to grant the
@@ -72,9 +73,11 @@ user passwordless sudo access.
 
 The `setup_comfy_env.sh` script installs ComfyUI into the directory specified as
 its second argument (for example `/data/marketing/comfy`), installs PyTorch from
-the official wheel index, clones any extensions listed in
-`comfy_data/extension_list.txt`, and copies `comfy_data/extra_model_paths.yaml`
-to the ComfyUI directory.
+the official wheel index, clones any extensions listed in the selected file from
+`comfy_data/extension_lists/`, and copies `comfy_data/extra_model_paths.yaml`
+to the ComfyUI directory. Each extension entry should include the repository URL
+followed by a flag indicating whether `pip install -r requirements.txt` should be
+executed inside that extension.
 
 ### S3 Mount Requirements
 

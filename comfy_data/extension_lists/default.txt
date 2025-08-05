@@ -1,0 +1,3 @@
+# repo_url pip_install_flag
+https://github.com/Comfy-Org/ComfyUI-Manager.git false
+https://github.com/Fannovel16/comfyui_controlnet_aux.git true

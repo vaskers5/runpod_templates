@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ $# -lt 2 ]; then
-  echo "Usage: $0 USERNAME COMFY_DIR [PYTHON_VERSION]" >&2
+if [ $# -lt 4 ]; then
+  echo "Usage: $0 USERNAME COMFY_DIR PYTHON_VERSION EXTENSION_LIST_NAME" >&2
   exit 1
 fi
 
 USERNAME="$1"
 COMFY_DIR="$2"
-PYTHON_VERSION="${3:-3.10}"
+PYTHON_VERSION="$3"
+EXT_LIST_NAME="$4"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMFY_ENV_NAME="${COMFY_ENV_NAME:-comfy_env}"
 COMFY_REPO_URL="${COMFY_REPO_URL:-https://github.com/comfyanonymous/ComfyUI.git}"
 COMFY_DATA_DIR="$(dirname "$COMFY_DIR")"
-COMFY_EXTENSION_LIST="${COMFY_EXTENSION_LIST:-$SCRIPT_DIR/comfy_data/extension_list.txt}"
+COMFY_EXTENSION_LIST_DIR="${COMFY_EXTENSION_LIST_DIR:-$SCRIPT_DIR/comfy_data/extension_lists}"
+COMFY_EXTENSION_LIST="$COMFY_EXTENSION_LIST_DIR/${EXT_LIST_NAME}.txt"
 COMFY_EXTRA_MODEL_PATHS="${COMFY_EXTRA_MODEL_PATHS:-$SCRIPT_DIR/comfy_data/extra_model_paths.yaml}"
 
 if [ "$EUID" -ne 0 ]; then
@@ -61,14 +63,19 @@ pip3 install -r requirements.txt
 
 if [ -f "$EXT_LIST" ]; then
   mkdir -p custom_nodes
-  while IFS= read -r repo; do
-    repo="\$(echo "\$repo" | xargs)"
-    [ -z "\$repo" ] && continue
-    [[ "\$repo" == \#* ]] && continue
+  while IFS= read -r line; do
+    line="\$(echo "\$line" | xargs)"
+    [ -z "\$line" ] && continue
+    [[ "\$line" == \#* ]] && continue
+    repo="\$(echo "\$line" | cut -d ' ' -f1)"
+    flag="\$(echo "\$line" | cut -s -d ' ' -f2 | tr '[:upper:]' '[:lower:]')"
     name="\$(basename "\$repo" .git)"
     target="custom_nodes/\$name"
     if [ ! -d "\$target" ]; then
       git clone "\$repo" "\$target"
+    fi
+    if [ -f "\$target/requirements.txt" ] && [[ "\$flag" == "true" || "\$flag" == "pip_install_true" ]]; then
+      (cd "\$target" && pip3 install -r requirements.txt)
     fi
   done < "$EXT_LIST"
 fi
