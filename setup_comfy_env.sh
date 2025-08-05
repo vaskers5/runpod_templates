@@ -39,7 +39,7 @@ sudo -u "$USERNAME" bash <<EOFUSER
 set -e
 source /etc/profile.d/conda.sh
 if ! conda env list | awk '{print \$1}' | grep -qx "$COMFY_ENV_NAME"; then
-  conda create -y -n "$COMFY_ENV_NAME" python="$PYTHON_VERSION"
+  conda create -y -n "$COMFY_ENV_NAME" -c conda-forge --override-channels python="$PYTHON_VERSION"
 fi
 conda activate "$COMFY_ENV_NAME"
 pip3 install --upgrade pip
@@ -55,13 +55,13 @@ pip3 install -r requirements.txt
 if [ -f "$EXT_LIST" ]; then
   mkdir -p custom_nodes
   while IFS= read -r repo; do
-    repo="$(echo "$repo" | xargs)"
-    [ -z "$repo" ] && continue
-    [[ "$repo" == \#* ]] && continue
-    name="$(basename "$repo" .git)"
-    target="custom_nodes/$name"
-    if [ ! -d "$target" ]; then
-      git clone "$repo" "$target"
+    repo="\$(echo "\$repo" | xargs)"
+    [ -z "\$repo" ] && continue
+    [[ "\$repo" == \#* ]] && continue
+    name="\$(basename "\$repo" .git)"
+    target="custom_nodes/\$name"
+    if [ ! -d "\$target" ]; then
+      git clone "\$repo" "\$target"
     fi
   done < "$EXT_LIST"
 fi
