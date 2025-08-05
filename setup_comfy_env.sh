@@ -55,13 +55,13 @@ pip3 install -r requirements.txt
 if [ -f "$EXT_LIST" ]; then
   mkdir -p custom_nodes
   while IFS= read -r repo; do
-    repo="$(echo "$repo" | xargs)"
-    [ -z "$repo" ] && continue
-    [[ "$repo" == \#* ]] && continue
-    name="$(basename "$repo" .git)"
-    target="custom_nodes/$name"
-    if [ ! -d "$target" ]; then
-      git clone "$repo" "$target"
+    repo="\$(echo "\$repo" | xargs)"
+    [ -z "\$repo" ] && continue
+    [[ "\$repo" == \#* ]] && continue
+    name="\$(basename "\$repo" .git)"
+    target="custom_nodes/\$name"
+    if [ ! -d "\$target" ]; then
+      git clone "\$repo" "\$target"
     fi
   done < "$EXT_LIST"
 fi
