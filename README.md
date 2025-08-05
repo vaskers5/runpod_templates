@@ -76,8 +76,9 @@ COMFY_EXTRA_MODEL_PATHS=comfy_data/extra_model_paths.yaml
 list with the format `username:ssh_key:sudo`. Set `sudo` to `true` to grant the
 user passwordless sudo access.
 
-The `setup_comfy_env.sh` script installs ComfyUI into `/data/marketing/comfy`,
-installs PyTorch from the official wheel index, clones any extensions listed in
+The `setup_comfy_env.sh` script installs ComfyUI into the directory specified as
+its second argument (for example `/data/marketing/comfy`), installs PyTorch from
+the official wheel index, clones any extensions listed in
 `comfy_data/extension_list.txt`, and copies `comfy_data/extra_model_paths.yaml`
 to the ComfyUI directory.
 

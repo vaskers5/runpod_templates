@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 USERNAME [PYTHON_VERSION]" >&2
+if [ $# -lt 2 ]; then
+  echo "Usage: $0 USERNAME COMFY_DIR [PYTHON_VERSION]" >&2
   exit 1
 fi
 
 USERNAME="$1"
-PYTHON_VERSION="${2:-3.10}"
+COMFY_DIR="$2"
+PYTHON_VERSION="${3:-3.10}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMFY_ENV_NAME="${COMFY_ENV_NAME:-comfy_env}"
 COMFY_REPO_URL="${COMFY_REPO_URL:-https://github.com/comfyanonymous/ComfyUI.git}"
-COMFY_DATA_DIR="${COMFY_DATA_DIR:-/data/marketing}"
-COMFY_DIR="${COMFY_DIR:-$COMFY_DATA_DIR/comfy}"
+COMFY_DATA_DIR="$(dirname "$COMFY_DIR")"
 COMFY_EXTENSION_LIST="${COMFY_EXTENSION_LIST:-$SCRIPT_DIR/comfy_data/extension_list.txt}"
 COMFY_EXTRA_MODEL_PATHS="${COMFY_EXTRA_MODEL_PATHS:-$SCRIPT_DIR/comfy_data/extra_model_paths.yaml}"
 
