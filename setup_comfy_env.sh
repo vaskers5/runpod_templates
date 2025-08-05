@@ -39,7 +39,7 @@ sudo -u "$USERNAME" bash <<EOFUSER
 set -e
 source /etc/profile.d/conda.sh
 if ! conda env list | awk '{print \$1}' | grep -qx "$COMFY_ENV_NAME"; then
-  conda create -y -n "$COMFY_ENV_NAME" python="$PYTHON_VERSION"
+  conda create -y -n "$COMFY_ENV_NAME" -c conda-forge --override-channels python="$PYTHON_VERSION"
 fi
 conda activate "$COMFY_ENV_NAME"
 pip3 install --upgrade pip
