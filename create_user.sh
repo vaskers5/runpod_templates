@@ -23,14 +23,21 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# Base directory for new user home directories
+USER_BASE_DIR="${USER_BASE_DIR:-/data}"
+
+mkdir -p "$USER_BASE_DIR"
+
 if id "$USERNAME" &>/dev/null; then
   echo "User '$USERNAME' already exists — skipping creation."
 else
-  adduser --disabled-password --gecos "" --shell /bin/bash "$USERNAME"
-  echo "Created user: $USERNAME"
+  # Create the user with a home under /data
+  adduser --disabled-password --gecos "" \
+    --home "${USER_BASE_DIR}/${USERNAME}" --shell /bin/bash "$USERNAME"
+  echo "Created user: $USERNAME at ${USER_BASE_DIR}/${USERNAME}"
 fi
 
-HOME_DIR="/home/${USERNAME}"
+HOME_DIR="${USER_BASE_DIR}/${USERNAME}"
 SSH_DIR="${HOME_DIR}/.ssh"
 
 mkdir -p "$SSH_DIR"

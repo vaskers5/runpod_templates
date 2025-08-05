@@ -1,0 +1,7 @@
+# Extra model search paths for ComfyUI.
+# Adjust these paths to point to your model directories.
+comfyui:
+  base_path: /data/marketing/models
+  checkpoints: checkpoints
+  loras: loras
+  vae: vae
