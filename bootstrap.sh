@@ -101,7 +101,7 @@ else
 fi
 
 # 3. S3-монтирование (не критично, если упадёт)
-/opt/scripts/mount_s3.sh || echo "mount_s3.sh завершился с ошибкой, продолжаем…"
+# /opt/scripts/mount_s3.sh || echo "mount_s3.sh завершился с ошибкой, продолжаем…"
 
 echo "--- Контейнер готов к работе. Ожидание подключения… ---"
 exec sleep infinity
