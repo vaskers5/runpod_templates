@@ -2,7 +2,7 @@
 # Adjust these paths to point to your model directories.
 ---
 comfyui:
-  base_path: /data/s3_storage/comfy_data_cloud
+  base_path: /data/comfy_data_cloud
   checkpoints: checkpoints
   clip: clip
   clip_vision: clip_vision
