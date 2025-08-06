@@ -24,29 +24,25 @@ if ! command -v rclone >/dev/null; then
   && rm -rf /var/lib/apt/lists/*
 fi
 
-# ── Rclone config that relies on env vars only ────────────────────────────────
+# ── Minimal rclone config (auth via env) ───────────────────────────────────────
 mkdir -p /root/.config/rclone
 cat > /root/.config/rclone/rclone.conf <<EOF
 [s3]
 type        = s3
-provider    = Minio           # or other provider if needed
+provider    = Minio
 env_auth    = true
 endpoint    = ${ENDPOINT}
 EOF
 
-# ── Exclusion rules (skip hidden dirs like .cache, .conda, etc.) ──────────────
-# You can add/adjust patterns as desired—one flag per rule.
-EXCLUDES=(
-  --exclude "/**/.cache/**"
-  --exclude "/**/.conda/**"
-  --exclude "/**/.git/**"
-  --exclude "/**/.ipynb_checkpoints/**"
-)
+# ── Exclude every “dot-directory” everywhere ──────────────────────────────────
+#  * '.*/**' matches any path element that starts with a dot, plus everything
+#    beneath it (so .cache/**,  dir/.git/**,  dir/sub/.conda/** … are all gone)
+EXCLUDES=( --exclude ".*/**" )
 
-# Helper: assemble exclusion flags into a single string for cron
+# Helper for cron (space-separated flags in one string)
 EXCLUDE_FLAGS="${EXCLUDES[*]}"
 
-# ── One-time local → S3 push on container start ───────────────────────────────
+# ── One-shot push on container start ──────────────────────────────────────────
 echo "$(date '+%F %T') Pushing local tree to s3://$BUCKET" | tee -a "$LOG_FILE"
 AWS_ACCESS_KEY_ID="$ACCESS_KEY" \
 AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
@@ -61,7 +57,7 @@ rclone sync "$DATA_DIR" "s3:$BUCKET" \
   --stats 1s --stats-one-line --stats-log-level NOTICE | tee -a "$LOG_FILE"
 echo "$(date '+%F %T') Initial push complete" | tee -a "$LOG_FILE"
 
-# ── Cron-based recurring push (every 6 hours) ────────────────────────────────
+# ── Cron-based recurring push (every 6 h) ──────────────────────────────────────
 if ! command -v cron >/dev/null; then
   apt-get update \
   && apt-get install -y --no-install-recommends cron \
