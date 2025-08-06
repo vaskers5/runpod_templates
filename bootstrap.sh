@@ -14,7 +14,7 @@ if [[ ! -f /opt/runpod_setup_complete ]]; then
   echo "Установка системных пакетов…"
   apt-get update -y
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    openssh-server sudo git ca-certificates nano wget \
+    openssh-server sudo git ca-certificates nano wget tmux \
     && rm -rf /var/lib/apt/lists/*
 
   # 2. Miniconda

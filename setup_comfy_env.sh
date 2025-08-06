@@ -29,13 +29,6 @@ if ! id "$USERNAME" &>/dev/null; then
   exit 1
 fi
 
-if ! command -v tmux >/dev/null 2>&1; then
-  echo "Installing tmux..."
-  apt-get update -y
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tmux
-  rm -rf /var/lib/apt/lists/*
-fi
-
 echo "--- Setting up ComfyUI environment '${COMFY_ENV_NAME}' for user '${USERNAME}'... ---"
 
 mkdir -p "$COMFY_DATA_DIR"
@@ -60,6 +53,7 @@ fi
 
 cd "$COMFY_DIR"
 pip3 install -r requirements.txt
+pip3 install insightface
 
 if [ -f "$EXT_LIST" ]; then
   mkdir -p custom_nodes
