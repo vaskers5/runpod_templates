@@ -19,12 +19,12 @@ mkdir -p "$(dirname "$LOG_FILE")" "$DATA_DIR"
 
 # ── Ensure rclone is available ────────────────────────────────────────────────
 if ! command -v rclone >/dev/null; then
-  apt-get update &&
-  apt-get install -y --no-install-recommends rclone &&
-  rm -rf /var/lib/apt/lists/*
+  apt-get update \
+  && apt-get install -y --no-install-recommends rclone \
+  && rm -rf /var/lib/apt/lists/*
 fi
 
-# ── Rclone config that relies on env vars ─────────────────────────────────────
+# ── Minimal rclone config (auth via env) ───────────────────────────────────────
 mkdir -p /root/.config/rclone
 cat > /root/.config/rclone/rclone.conf <<EOF
 [s3]
@@ -34,25 +34,34 @@ env_auth    = true
 endpoint    = ${ENDPOINT}
 EOF
 
-# ── Single push run on container start (optional) ─────────────────────────────
+# ── Exclude every “dot-directory” everywhere ──────────────────────────────────
+#  * '.*/**' matches any path element that starts with a dot, plus everything
+#    beneath it (so .cache/**,  dir/.git/**,  dir/sub/.conda/** … are all gone)
+EXCLUDES=( --exclude ".*/**" )
+
+# Helper for cron (space-separated flags in one string)
+EXCLUDE_FLAGS="${EXCLUDES[*]}"
+
+# ── One-shot push on container start ──────────────────────────────────────────
 echo "$(date '+%F %T') Pushing local tree to s3://$BUCKET" | tee -a "$LOG_FILE"
 AWS_ACCESS_KEY_ID="$ACCESS_KEY" \
 AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
 AWS_EC2_METADATA_DISABLED=true \
 rclone sync "$DATA_DIR" "s3:$BUCKET" \
+  "${EXCLUDES[@]}" \
   --s3-endpoint "$ENDPOINT" \
   --fast-list \
-  --buffer-size=64M --s3-chunk-size=64M \
-  --s3-upload-concurrency="$CPU_COUNT" \
-  --transfers="$CPU_COUNT" --checkers="$CPU_COUNT" \
-  --stats=1s --stats-one-line --stats-log-level NOTICE | tee -a "$LOG_FILE"
+  --buffer-size 64M --s3-chunk-size 64M \
+  --s3-upload-concurrency "$CPU_COUNT" \
+  --transfers "$CPU_COUNT" --checkers "$CPU_COUNT" \
+  --stats 1s --stats-one-line --stats-log-level NOTICE | tee -a "$LOG_FILE"
 echo "$(date '+%F %T') Initial push complete" | tee -a "$LOG_FILE"
 
-# ── Cron-based recurring push (every 6 h here) ────────────────────────────────
+# ── Cron-based recurring push (every 6 h) ──────────────────────────────────────
 if ! command -v cron >/dev/null; then
-  apt-get update &&
-  apt-get install -y --no-install-recommends cron &&
-  rm -rf /var/lib/apt/lists/*
+  apt-get update \
+  && apt-get install -y --no-install-recommends cron \
+  && rm -rf /var/lib/apt/lists/*
 fi
 
 cat > /etc/cron.d/s3_push <<EOF
@@ -62,12 +71,13 @@ cat > /etc/cron.d/s3_push <<EOF
   AWS_SECRET_ACCESS_KEY=$SECRET_KEY \
   AWS_EC2_METADATA_DISABLED=true \
   rclone sync "$DATA_DIR" "s3:$BUCKET" \
+    $EXCLUDE_FLAGS \
     --s3-endpoint "$ENDPOINT" \
     --fast-list \
-    --buffer-size=64M --s3-chunk-size=64M \
-    --s3-upload-concurrency=$CPU_COUNT \
-    --transfers=$CPU_COUNT --checkers=$CPU_COUNT \
-    --stats=1s --stats-one-line --stats-log-level NOTICE >> $LOG_FILE 2>&1
+    --buffer-size 64M --s3-chunk-size 64M \
+    --s3-upload-concurrency $CPU_COUNT \
+    --transfers $CPU_COUNT --checkers $CPU_COUNT \
+    --stats 1s --stats-one-line --stats-log-level NOTICE >> $LOG_FILE 2>&1
 EOF
 
 chmod 644 /etc/cron.d/s3_push
