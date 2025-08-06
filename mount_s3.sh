@@ -3,6 +3,7 @@ set -euo pipefail
 
 BUCKET="${S3_BUCKET:-}"   # required bucket name
 MOUNT_POINT="${S3_MOUNT_POINT:-/mnt/s3}"
+DATA_DIR="${S3_SYNC_DIR:-/data}"
 ACCESS_KEY="${S3__ACCESS_KEY:-}"
 SECRET_KEY="${S3__SECRET_KEY:-}"
 ENDPOINT="${S3__ENDPOINT_URL:-}"
@@ -45,16 +46,16 @@ EOF
   fi
 }
 
-# sync files as a fallback when FUSE mounting is unavailable or fails
+# sync files from S3 to the local data directory when FUSE mounting is unavailable or fails
 perform_sync() {
   ensure_sync_tools
-  mkdir -p "$MOUNT_POINT"
-  echo "$(date '+%F %T') Starting sync from s3://$BUCKET to $MOUNT_POINT" | tee -a "$LOG_FILE"
+  mkdir -p "$DATA_DIR"
+  echo "$(date '+%F %T') Starting sync from s3://$BUCKET to $DATA_DIR" | tee -a "$LOG_FILE"
   if command -v rclone >/dev/null 2>&1; then
     echo "$(date '+%F %T') syncing via rclone" | tee -a "$LOG_FILE"
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
-      rclone copy "s3:$BUCKET" "$MOUNT_POINT" --s3-endpoint "$ENDPOINT" \
+      rclone sync "s3:$BUCKET" "$DATA_DIR" --s3-endpoint "$ENDPOINT" \
         --stats=1s --stats-one-line --stats-log-level NOTICE \
         --buffer-size=64M --s3-chunk-size=64M \
         --s3-upload-concurrency="$CPU_COUNT" \
@@ -64,14 +65,27 @@ perform_sync() {
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true \
       s5cmd --stat --endpoint-url "$ENDPOINT" \
-        sync --concurrency "$CPU_COUNT" "s3://$BUCKET/*" "$MOUNT_POINT/" | tee -a "$LOG_FILE"
+        sync --concurrency "$CPU_COUNT" "s3://$BUCKET/*" "$DATA_DIR/" | tee -a "$LOG_FILE"
   else
     echo "$(date '+%F %T') syncing via aws s3 sync" | tee -a "$LOG_FILE"
     AWS_ACCESS_KEY_ID="$ACCESS_KEY" AWS_SECRET_ACCESS_KEY="$SECRET_KEY" \
       AWS_EC2_METADATA_DISABLED=true AWS_MAX_CONCURRENCY="$CPU_COUNT" \
-      aws s3 sync "s3://$BUCKET" "$MOUNT_POINT" --endpoint-url "$ENDPOINT" | tee -a "$LOG_FILE"
+      aws s3 sync "s3://$BUCKET" "$DATA_DIR" --endpoint-url "$ENDPOINT" | tee -a "$LOG_FILE"
   fi
   echo "$(date '+%F %T') Sync complete" | tee -a "$LOG_FILE"
+}
+
+# configure a cron job to periodically sync the local data directory back to S3
+setup_periodic_sync() {
+  ensure_sync_tools
+  if ! command -v cron >/dev/null 2>&1; then
+    apt-get update && apt-get install -y --no-install-recommends cron && rm -rf /var/lib/apt/lists/*
+  fi
+  cat <<EOF >/etc/cron.d/s3_sync
+0 */12 * * * root AWS_ACCESS_KEY_ID=$ACCESS_KEY AWS_SECRET_ACCESS_KEY=$SECRET_KEY AWS_EC2_METADATA_DISABLED=true rclone sync "$DATA_DIR" "s3:$BUCKET" --s3-endpoint "$ENDPOINT" --stats=1s --stats-one-line --stats-log-level NOTICE --buffer-size=64M --s3-chunk-size=64M --s3-upload-concurrency=$CPU_COUNT --transfers=$CPU_COUNT --checkers=$CPU_COUNT >> $LOG_FILE 2>&1
+EOF
+  chmod 644 /etc/cron.d/s3_sync
+  service cron start >/dev/null 2>&1 || true
 }
 
 if [[ -z "$BUCKET" || -z "$ACCESS_KEY" || -z "$SECRET_KEY" || -z "$ENDPOINT" ]]; then
@@ -120,3 +134,5 @@ else
     perform_sync
   fi
 fi
+
+setup_periodic_sync
