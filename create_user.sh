@@ -23,33 +23,45 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-# Base directory for new user home directories
+# База для домашних каталогов (по умолчанию /data)
 USER_BASE_DIR="${USER_BASE_DIR:-/data}"
+HOME_DIR="${USER_BASE_DIR}/${USERNAME}"
+SSH_DIR="${HOME_DIR}/.ssh"
 
 mkdir -p "$USER_BASE_DIR"
 
 if id "$USERNAME" &>/dev/null; then
   echo "User '$USERNAME' already exists — skipping creation."
+  # убедимся, что домашка правильная (не переприсваиваем, только создаём при отсутствии)
+  if [[ ! -d "$HOME_DIR" ]]; then
+    mkdir -p "$HOME_DIR"
+    chown -R "$USERNAME:$USERNAME" "$HOME_DIR"
+  fi
 else
-  # Create the user with a home under /data
+  # создаём пользователя с домашкой под /data/<user>
   adduser --disabled-password --gecos "" \
-    --home "${USER_BASE_DIR}/${USERNAME}" --shell /bin/bash "$USERNAME"
-  echo "Created user: $USERNAME at ${USER_BASE_DIR}/${USERNAME}"
+    --home "$HOME_DIR" --shell /bin/bash "$USERNAME"
+  echo "Created user: $USERNAME at $HOME_DIR"
 fi
 
-HOME_DIR="${USER_BASE_DIR}/${USERNAME}"
-SSH_DIR="${HOME_DIR}/.ssh"
-
+# .ssh и ключи
 mkdir -p "$SSH_DIR"
 chmod 700 "$SSH_DIR"
 chown "$USERNAME:$USERNAME" "$SSH_DIR"
 
-# Ensure authorized_keys exists and append to avoid overwriting
-cat "$SSH_KEY_PATH" >> "${SSH_DIR}/authorized_keys"
+touch "${SSH_DIR}/authorized_keys"
 chmod 600 "${SSH_DIR}/authorized_keys"
 chown "$USERNAME:$USERNAME" "${SSH_DIR}/authorized_keys"
-echo "SSH public key added to $SSH_DIR/authorized_keys"
 
+# Добавляем ключ ТОЛЬКО если его ещё нет (без дублей)
+if ! grep -qxF "$(cat "$SSH_KEY_PATH")" "${SSH_DIR}/authorized_keys"; then
+  cat "$SSH_KEY_PATH" >> "${SSH_DIR}/authorized_keys"
+  echo "SSH public key appended to ${SSH_DIR}/authorized_keys"
+else
+  echo "SSH public key already present — skipping."
+fi
+
+# Sudo (точечно, идемпотентно)
 if [ "$SUDO_FLAG" -eq 1 ]; then
   mkdir -p /etc/sudoers.d
   chmod 750 /etc/sudoers.d
@@ -58,7 +70,9 @@ if [ "$SUDO_FLAG" -eq 1 ]; then
   echo "Granted passwordless sudo to '$USERNAME'"
 fi
 
+# На всякий случай выставим владельцев в домашке пользователя (ТОЛЬКО в его домашке)
+chown -R "$USERNAME:$USERNAME" "$HOME_DIR"
+
 echo
 echo "✅ Setup complete for user '$USERNAME'."
-echo "SSH connection command:"
-echo "    ssh -i /path/to/private_key ${USERNAME}@${SERVER}"
+[[ -n "$SERVER" ]] && echo "SSH connection command:" && echo "    ssh -i /path/to/private_key ${USERNAME}@${SERVER}"
