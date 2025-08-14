@@ -1,86 +1,63 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ $# -lt 4 ]; then
-  echo "Usage: $0 USERNAME COMFY_DIR PYTHON_VERSION EXTENSION_LIST_NAME" >&2
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 USERNAME [PYTHON_VERSION]"
   exit 1
 fi
 
 USERNAME="$1"
-COMFY_DIR="$2"
-PYTHON_VERSION="$3"
-EXT_LIST_NAME="$4"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMFY_ENV_NAME="${COMFY_ENV_NAME:-comfy_env}"
-COMFY_REPO_URL="${COMFY_REPO_URL:-https://github.com/comfyanonymous/ComfyUI.git}"
-COMFY_DATA_DIR="$(dirname "$COMFY_DIR")"
-COMFY_EXTENSION_LIST_DIR="${COMFY_EXTENSION_LIST_DIR:-$SCRIPT_DIR/comfy_data/extension_lists}"
-COMFY_EXTENSION_LIST="$COMFY_EXTENSION_LIST_DIR/${EXT_LIST_NAME}.txt"
-COMFY_EXTRA_MODEL_PATHS="${COMFY_EXTRA_MODEL_PATHS:-$SCRIPT_DIR/comfy_data/extra_model_paths.yaml}"
+PYTHON_VERSION="${2:-3.10}"          # по умолчанию Python 3.10
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-work}"  # имя окружения по умолчанию (НЕ 'base')
 
 if [ "$EUID" -ne 0 ]; then
-  echo "This script must run as root." >&2
+  echo "This script must run as root."
   exit 1
 fi
 
 if ! id "$USERNAME" &>/dev/null; then
-  echo "Error: User '$USERNAME' does not exist." >&2
+  echo "Error: User '$USERNAME' does not exist. Cannot create Conda environment."
   exit 1
 fi
 
-echo "--- Setting up ComfyUI environment '${COMFY_ENV_NAME}' for user '${USERNAME}'... ---"
+# проверим наличие conda
+if [[ ! -f /etc/profile.d/conda.sh ]]; then
+  echo "Warning: /etc/profile.d/conda.sh not found — conda may be missing. Skipping env setup."
+  exit 0
+fi
 
-mkdir -p "$COMFY_DATA_DIR"
-chown -R "$USERNAME":"$USERNAME" "$COMFY_DATA_DIR"
+echo "--- Setting up Conda environment for '$USERNAME' with Python $PYTHON_VERSION (env: $CONDA_ENV_NAME)… ---"
 
-EXT_LIST="$COMFY_EXTENSION_LIST"
-EXTRA_MODELS="$COMFY_EXTRA_MODEL_PATHS"
-
-sudo -u "$USERNAME" bash <<EOFUSER
-set -e
+sudo -u "$USERNAME" bash <<'EOF'
+set -Eeuo pipefail
 source /etc/profile.d/conda.sh
-if ! conda env list | awk '{print \$1}' | grep -qx "$COMFY_ENV_NAME"; then
-  conda create -y -n "$COMFY_ENV_NAME" -c conda-forge --override-channels python="$PYTHON_VERSION"
+
+# Если 'conda' не доступна для пользователя — ничего не делаем
+if ! command -v conda >/dev/null 2>&1; then
+  echo "Warning: conda not found in PATH for user. Skipping."
+  exit 0
 fi
-conda activate "$COMFY_ENV_NAME"
-pip3 install --upgrade pip
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+EOF
 
-if [ ! -d "$COMFY_DIR" ]; then
-  git clone "$COMFY_REPO_URL" "$COMFY_DIR"
-fi
+# Передаём переменные внутрь heredoc корректно
+sudo -u "$USERNAME" bash <<EOF
+set -Eeuo pipefail
+source /etc/profile.d/conda.sh
 
-cd "$COMFY_DIR"
-pip3 install -r requirements.txt
-pip3 install insightface
-
-if [ -f "$EXT_LIST" ]; then
-  mkdir -p custom_nodes
-  while IFS= read -r line; do
-    line="\$(echo "\$line" | xargs)"
-    [ -z "\$line" ] && continue
-    [[ "\$line" == \#* ]] && continue
-    repo="\$(echo "\$line" | cut -d ' ' -f1)"
-    flag="\$(echo "\$line" | cut -s -d ' ' -f2 | tr '[:upper:]' '[:lower:]')"
-    name="\$(basename "\$repo" .git)"
-    target="custom_nodes/\$name"
-    if [ ! -d "\$target" ]; then
-      git clone "\$repo" "\$target"
-    fi
-    if [ -f "\$target/requirements.txt" ] && [[ "\$flag" == "true" || "\$flag" == "pip_install_true" ]]; then
-      (cd "\$target" && pip3 install -r requirements.txt)
-    fi
-  done < "$EXT_LIST"
+# Проверяем, есть ли уже окружение с именем ${CONDA_ENV_NAME}
+if conda env list | awk '{print \$1}' | grep -qx "${CONDA_ENV_NAME}"; then
+  echo "Conda env '${CONDA_ENV_NAME}' уже существует — пропускаю создание."
+else
+  conda create -n "${CONDA_ENV_NAME}" -y python="${PYTHON_VERSION}"
+  echo "Conda environment '${CONDA_ENV_NAME}' создан."
 fi
 
-if [ -f "$EXTRA_MODELS" ]; then
-  cp "$EXTRA_MODELS" extra_model_paths.yaml
+# Инициализация оболочки один раз (если не сделана)
+if ! grep -q 'conda initialize' "\$HOME/.bashrc" 2>/dev/null; then
+  conda init bash
 fi
-EOFUSER
 
-USER_HOME=$(eval echo ~"$USERNAME")
-printf '\nexport COMFY_DATA_DIR="%s"\nexport COMFY_DIR="%s"\nexport COMFY_ENV_NAME="%s"\n' "$COMFY_DATA_DIR" "$COMFY_DIR" "$COMFY_ENV_NAME" | sudo -u "$USERNAME" tee -a "$USER_HOME/.bashrc" >/dev/null
+echo "Conda setup complete for user."
+EOF
 
-echo "✅ ComfyUI environment '$COMFY_ENV_NAME' set up at '$COMFY_DIR' for user '$USERNAME'."
-echo "To use it run: conda activate $COMFY_ENV_NAME && cd $COMFY_DIR"
+echo "✅ Conda setup complete for user '$USERNAME'."
